@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tam Sayılarda Amiral Battı</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Fredoka', sans-serif;
+            user-select: none;
+        }
+        .grid-cell {
+            transition: all 0.2s ease;
+        }
+        .grid-cell:hover:not(.hit):not(.miss) {
+            transform: scale(1.05);
+            border-color: rgba(99, 102, 241, 0.6);
+        }
+        @keyframes pulseBoom {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .boom-anim {
+            animation: pulseBoom 0.3s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-950 via-sky-950 to-indigo-950 text-white min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-4xl bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl overflow-hidden p-6 md:p-8 flex flex-col gap-6">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row items-center justify-between border-b border-white/10 pb-4 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-sky-600/50 p-2.5 rounded-2xl border border-sky-400/30">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-sky-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-bold tracking-wide">Tam Sayılarda Amiral Battı</h1>
+                    <p class="text-xs text-sky-300">İşlemleri çöz, koordinatları bul, düşman gemilerini batır!</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <div class="bg-black/30 px-3.5 py-1.5 rounded-xl border border-white/10 text-center">
+                    <span class="block text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Kalan Atış / Hak</span>
+                    <span id="torpedo-display" class="text-lg font-bold text-sky-400">20</span>
+                </div>
+                <div class="bg-black/30 px-3.5 py-1.5 rounded-xl border border-white/10 text-center">
+                    <span class="block text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Skor</span>
+                    <span id="score-display" class="text-lg font-bold text-amber-400">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. Start Menu Screen -->
+        <div id="screen-menu" class="flex flex-col items-center justify-center py-6 text-center gap-6">
+            <div class="w-20 h-20 bg-gradient-to-tr from-sky-500 to-indigo-600 rounded-3xl flex items-center justify-center text-4xl shadow-lg">
+                🚢
+            </div>
+            <div class="space-y-2 max-w-md">
+                <h2 class="text-2xl md:text-3xl font-bold">Deniz Savaşına Hazır Mısın?</h2>
+                <p class="text-sm text-gray-300">Karşında 6x6'lık bir deniz alanı var. Tam sayılarla toplama ve çıkarma işlemlerini çözerek doğru koordinatları bul ve gizli gemileri (Kruvazör ve Destroyerler) bulup batır!</p>
+            </div>
+            
+            <button onclick="startGame()" class="mt-2 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold px-10 py-4 rounded-2xl shadow-xl transition transform hover:scale-105 active:scale-95 text-lg cursor-pointer">
+                Oyunu Başlat ⚓
+            </button>
+        </div>
+
+        <!-- 2. Game Play Screen -->
+        <div id="screen-game" class="hidden flex flex-col lg:flex-row gap-6 items-center justify-center">
+            
+            <!-- Left Side: Interactive Map Grid (6x6) -->
+            <div class="flex flex-col items-center gap-3">
+                <div class="text-xs text-sky-200 font-semibold uppercase tracking-wider">Hedef Izgarası (6x6)</div>
+                <div id="battlefield-grid" class="grid grid-cols-6 gap-2 bg-black/30 p-4 rounded-3xl border border-white/10 shadow-inner">
+                    <!-- Injected by JS -->
+                </div>
+                <div class="flex items-center gap-4 text-xs text-gray-400 mt-1">
+                    <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-rose-500 rounded-full inline-block"></span> Vuruldu (İsabet)</div>
+                    <div class="flex items-center gap-1.5"><span class="w-3 h-3 bg-slate-600 rounded-full inline-block"></span> Iska (Boş)</div>
+                </div>
+            </div>
+
+            <!-- Right Side: Active Math Challenge Panel -->
+            <div class="flex-1 w-full bg-black/25 border border-white/10 rounded-3xl p-6 flex flex-col justify-between gap-6 shadow-inner">
+                
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span id="target-coord-label" class="text-sm font-bold text-indigo-300">Hedef Koordinat: Seçiliyor...</span>
+                    <span class="text-xs bg-sky-500/20 text-sky-300 border border-sky-400/30 px-3 py-1 rounded-full font-semibold">Ateş Paneli</span>
+                </div>
+
+                <!-- Math Problem Display -->
+                <div class="flex flex-col items-center justify-center py-4">
+                    <p class="text-xs text-gray-400 mb-3">Bu hücreyi açmak için aşağıdaki tam sayı işlemini çöz:</p>
+                    <div id="equation-box" class="flex items-center justify-center gap-3 text-3xl md:text-4xl font-black tracking-wider my-2">
+                        <!-- Equation injected here -->
+                    </div>
+                    <div id="math-hint" class="text-xs text-sky-300 mt-2 italic text-center">
+                        <!-- Hint text -->
+                    </div>
+                </div>
+
+                <!-- Options Grid -->
+                <div id="math-options" class="grid grid-cols-2 gap-3">
+                    <!-- Option buttons -->
+                </div>
+
+                <!-- Feedback banner -->
+                <div id="game-feedback" class="h-10 flex items-center justify-center text-sm font-bold rounded-xl transition-all duration-300 opacity-0"></div>
+
+            </div>
+
+        </div>
+
+        <!-- 3. Result Screen -->
+        <div id="screen-result" class="hidden flex flex-col items-center justify-center py-6 text-center gap-6">
+            <div class="text-6xl mb-1 animate-bounce" id="result-emoji">🎉</div>
+            <div class="space-y-2">
+                <h2 class="text-3xl font-bold" id="result-title">Savaş Sona Erdi!</h2>
+                <p class="text-gray-300 text-sm" id="result-message">Tüm gemileri başarıyla imha ettin.</p>
+            </div>
+
+            <div class="bg-black/30 border border-white/10 rounded-2xl p-5 w-full max-w-sm flex flex-col gap-2 text-center">
+                <span class="text-xs text-gray-400 uppercase font-semibold">Toplam Skor</span>
+                <span id="final-score-val" class="text-3xl font-black text-amber-400">0</span>
+            </div>
+
+            <button onclick="resetToMenu()" class="bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold px-8 py-3.5 rounded-2xl shadow-xl transition cursor-pointer">
+                Yeni Savaşa Başla 🔄
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        const gridSize = 6; // 6x6 grid -> Rows A-F (0-5), Cols 1-6 (0-5)
+        let gridState = []; // 20: empty, 1: ship, 2: hit, 3: miss
+        let shipMap = [];   // stores true if ship is present
+        let torpedoes = 18;
+        let score = 0;
+        let activeRow = 0;
+        let activeCol = 0;
+        let currentEquationAnswer = 0;
+        let gameActive = false;
+        let remainingShipParts = 0;
+
+        const rowLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+        function startGame() {
+            torpedoes = 18;
+            score = 0;
+            gameActive = true;
+            
+            document.getElementById('screen-menu').classList.add('hidden');
+            document.getElementById('screen-result').classList.add('hidden');
+            document.getElementById('screen-game').classList.remove('hidden');
+
+            initGridAndShips();
+            updateStatsUI();
+            
+            // Auto select first unclicked cell or prompt user to click a cell
+            selectCell(0, 0);
+        }
+
+        function initGridAndShips() {
+            gridState = Array(gridSize).fill(0).map(() => Array(gridSize).fill(0)); // 0: unexplored, 2: hit, 3: miss
+            shipMap = Array(gridSize).fill(0).map(() => Array(gridSize).fill(false));
+
+            // Place ships randomly: 1 Cruiser (3 blocks), 2 Destroyers (2 blocks each) = 7 total ship blocks
+            placeShipRandomly(3); // Cruiser
+            placeShipRandomly(2); // Destroyer 1
+            placeShipRandomly(2); // Destroyer 2
+
+            remainingShipParts = 7;
+            renderBattlefieldGrid();
+        }
+
+        function placeShipRandomly(length) {
+            let placed = false;
+            while (!placed) {
+                let horizontal = Math.random() < 0.5;
+                let r = Math.floor(Math.random() * gridSize);
+                let c = Math.floor(Math.random() * gridSize);
+
+                if (horizontal && c + length <= gridSize) {
+                    let canPlace = true;
+                    for (let i = 0; i < length; i++) {
+                        if (shipMap[r][c + i]) canPlace = false;
+                    }
+                    if (canPlace) {
+                        for (let i = 0; i < length; i++) {
+                            shipMap[r][c + i] = true;
+                        }
+                        placed = true;
+                    }
+                } else if (!horizontal && r + length <= gridSize) {
+                    let canPlace = true;
+                    for (let i = 0; i < length; i++) {
+                        if (shipMap[r + i][c]) canPlace = false;
+                    }
+                    if (canPlace) {
+                        for (let i = 0; i < length; i++) {
+                            shipMap[r + i][c] = true;
+                        }
+                        placed = true;
+                    }
+                }
+            }
+        }
+
+        function renderBattlefieldGrid() {
+            const gridContainer = document.getElementById('battlefield-grid');
+            gridContainer.innerHTML = '';
+
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    const cell = document.createElement('button');
+                    cell.className = "grid-cell w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-bold text-sm border border-white/10 bg-black/40 cursor-pointer shadow-sm";
+                    
+                    let label = `${rowLabels[r]}${c+1}`;
+                    
+                    if (gridState[r][c] === 2) {
+                        cell.className += " bg-rose-600 border-rose-400 text-white boom-anim";
+                        cell.innerHTML = "💥";
+                    } else if (gridState[r][c] === 3) {
+                        cell.className += " bg-slate-700/60 border-slate-500 text-gray-400";
+                        cell.innerHTML = "🌊";
+                    } else {
+                        cell.innerHTML = `<span class="text-sky-300">${label}</span>`;
+                        cell.onclick = () => selectCell(r, c);
+                    }
+
+                    gridContainer.appendChild(cell);
+                }
+            }
+        }
+
+        function selectCell(r, c) {
+            if (!gameActive) return;
+            if (gridState[r][c] !== 0) {
+                showFeedback(false, "Bu koordinat zaten ateş edilmiş!");
+                return;
+            }
+
+            activeRow = r;
+            activeCol = c;
+
+            document.getElementById('target-coord-label').textContent = `Seçilen Koordinat: ${rowLabels[r]}${c+1}`;
+            generateMathProblemForCell();
+        }
+
+        function generateMathProblemForCell() {
+            let a = getRandomInt(-20, 20);
+            let b = getRandomInt(-20, 20);
+            if (a === 0) a = 5;
+            if (b === 0) b = -4;
+
+            const ops = ['+', '-'];
+            const op = ops[Math.floor(Math.random() * ops.length)];
+
+            if (op === '+') {
+                currentEquationAnswer = a + b;
+            } else {
+                currentEquationAnswer = a - b;
+            }
+
+            // Render equation
+            const eqBox = document.getElementById('equation-box');
+            const fmt = (n) => n < 0 ? `<span class="text-rose-400">(${n})</span>` : `<span class="text-emerald-400">${n}</span>`;
+            
+            eqBox.innerHTML = `
+                <span>${fmt(a)}</span>
+                <span class="text-sky-300">${op}</span>
+                <span>${fmt(b)}</span>
+                <span class="text-gray-400">=</span>
+                <span class="text-amber-300">?</span>
+            `;
+
+            // Hint
+            let hintEl = document.getElementById('math-hint');
+            if (op === '+') {
+                hintEl.innerHTML = "💡 İpucu: Aynı işaretler toplanır, zıt işaretlerde büyükten küçük çıkarılır.";
+            } else {
+                hintEl.innerHTML = "💡 İpucu: Çıkan sayının işareti ters çevrilip toplama yapılır.";
+            }
+
+            generateOptions(currentEquationAnswer);
+        }
+
+        function generateOptions(correct) {
+            const optGrid = document.getElementById('math-options');
+            optGrid.innerHTML = '';
+
+            let options = [correct];
+            while (options.length < 4) {
+                let offset = getRandomInt(-6, 6);
+                let wrong = correct + (offset === 0 ? 2 : offset);
+                if (!options.includes(wrong)) {
+                    options.push(wrong);
+                }
+            }
+            options.sort(() => Math.random() - 0.5);
+
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = "bg-white/10 hover:bg-white/20 border border-white/20 rounded-xl py-3.5 text-xl font-bold transition transform active:scale-95 cursor-pointer shadow-md";
+                btn.textContent = opt;
+                btn.onclick = () => submitAnswer(opt);
+                optGrid.appendChild(btn);
+            });
+        }
+
+        function submitAnswer(selectedVal) {
+            if (!gameActive) return;
+
+            torpedoes--;
+            const isCorrect = (selectedVal === currentEquationAnswer);
+
+            if (isCorrect) {
+                // Check if ship exists at activeRow, activeCol
+                if (shipMap[activeRow][activeCol]) {
+                    gridState[activeRow][activeCol] = 2; // Hit
+                    remainingShipParts--;
+                    score += 50;
+                    showFeedback(true, "🎯 İSABET! Düşman gemisi vuruldu! (+50 Puan)");
+                } else {
+                    gridState[activeRow][activeCol] = 3; // Miss
+                    showFeedback(false, "🌊 ISKA! Bu koordinatta gemi yok.");
+                }
+            } else {
+                gridState[activeRow][activeCol] = 3; // Miss due to wrong math
+                showFeedback(false, `❌ Hatalı İşlem! Doğru cevap ${currentEquationAnswer} idi. Torpido boşa gitti.`);
+            }
+
+            renderBattlefieldGrid();
+            updateStatsUI();
+
+            if (remainingShipParts === 0) {
+                endGame(true);
+                return;
+            }
+
+            if (torpedoes <= 0) {
+                endGame(false);
+                return;
+            }
+
+            // Pick next available unexplored cell if possible
+            setTimeout(() => {
+                findNextUnexploredCell();
+            }, 1500);
+        }
+
+        function findNextUnexploredCell() {
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (gridState[r][c] === 0) {
+                        selectCell(r, c);
+                        return;
+                    }
+                }
+            }
+        }
+
+        function updateStatsUI() {
+            document.getElementById('torpedo-display').textContent = torpedoes;
+            document.getElementById('score-display').textContent = score;
+        }
+
+        function showFeedback(isSuccess, msg) {
+            const fb = document.getElementById('game-feedback');
+            fb.textContent = msg;
+            fb.className = `h-10 flex items-center justify-center text-sm font-bold rounded-xl transition-all duration-300 opacity-100 ${isSuccess ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`;
+        }
+
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function endGame(won) {
+            gameActive = false;
+            document.getElementById('screen-game').classList.add('hidden');
+            document.getElementById('screen-result').classList.remove('hidden');
+
+            document.getElementById('result-emoji').textContent = won ? '🏆' : '💥';
+            document.getElementById('result-title').textContent = won ? 'Tebrikler, Amiral!' : 'Torpido Hakların Bitti!';
+            document.getElementById('result-message').textContent = won ? 'Tüm düşman gemilerini başarıyla yok ettin!' : 'Maalesef gemilerin bir kısmı kurtuldu.';
+            document.getElementById('final-score-val').textContent = score;
+        }
+
+        function resetToMenu() {
+            document.getElementById('screen-result').classList.add('hidden');
+            document.getElementById('screen-menu').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
